@@ -1,0 +1,20 @@
+V2 (With AMI - ami-049bd024ee2a1e981)(Ubuntu_Solr_Spark_Docker_Scala_SBT_Maven)
+source /etc/environment
+start-master.sh
+start-slave.sh spark://localhost:7077
+
+cd /home/ubuntu/sparkler/sparkler-core
+./release.sh
+
+cd ~/solr-8.5.0
+bin/solr start
+
+
+java -Xms1g -cp /home/ubuntu/sparkler/sparkler-core/build/conf:$(echo /home/ubuntu/sparkler/sparkler-core/build/sparkler-app-0.5.24-SNAPSHOT/lib/*.jar | tr ' ' ':') -Dpf4j.pluginsDir=/home/ubuntu/sparkler/sparkler-core/build/plugins edu.usc.irds.sparkler.Main inject -id sjob-2 -su https://edition.cnn.com
+
+
+
+java -Xms1g -cp /home/ubuntu/sparkler/sparkler-core/build/conf:$(echo /home/ubuntu/sparkler/sparkler-core/build/sparkler-app-0.5.24-SNAPSHOT/lib/*.jar | tr ' ' ':') -Dpf4j.pluginsDir=/home/ubuntu/sparkler/sparkler-core/build/plugins edu.usc.irds.sparkler.Main crawl -id sjob-2 -tn 10 -i 1
+
+
+http://ec2-54-169-110-182.ap-southeast-1.compute.amazonaws.com:8983/solr/#/crawldb/query
