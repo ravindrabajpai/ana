@@ -1,0 +1,163 @@
+# c5 instance with ubuntu 20+ and 30 gp disk space
+# ssh to the instnace and run following commands
+sudo apt install net-tools
+
+#JAVA
+sudo apt-get update
+sudo apt-get install openjdk-8-jdk
+java -version
+
+#DOCKER
+sudo apt-get install     ca-certificates     curl     gnupg     lsb-release
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo   "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io
+sudo docker run hello-world
+
+#SCALA
+wget www.scala-lang.org/files/archive/scala-2.13.0.deb
+sudo dpkg -i scala*.deb
+
+#SBT
+sudo apt-get update
+sudo apt-get install apt-transport-https curl gnupg -yqq
+echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
+echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | sudo tee /etc/apt/sources.list.d/sbt_old.list
+curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo -H gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalasbt-release.gpg --import
+sudo chmod 644 /etc/apt/trusted.gpg.d/scalasbt-release.gpg
+sudo apt-get update
+sudo apt-get install sbt
+
+#maven
+sudo apt install maven
+
+#Clone and build Sparkler
+git clone https://github.com/USCDataScience/sparkler
+cd sparkler/
+-->> sbt package
+
+#Release - remove test from ./release.sh and commit
+vi ./release.sh
+ - remove test
+
+Remove or comment-out the line from ./sparkler-app/src/main/scala/edu/usc/irds/sparkler/storage/solr/StatusUpdateSolrTransformer.scala
+//Constants.storage.CONTENTHASH -> ContentHash.fetchHash(data.fetchedData.getContent)
+
+add follwing at ./sparkler-app/src/main/scala/edu/usc/irds/sparkler/pipeline/Crawler.scala:171
+conf.set("spark.io.compression.codec", "snappy")
+git commit -a -m "removed test"
+./sparkler-app/src/main/scala/edu/usc/irds/sparkler/pipeline/Crawler.scala
+ - 171: conf.set("spark.io.compression.codec", "snappy")
+chmod 754 release.sh
+./release.sh
+ls /home/ubuntu/sparkler/sparkler-core/build/sparkler-app-0.5.24-SNAPSHOT/lib/com.kythera.sparkler-app-0.5.24-SNAPSHOT.jar
+
+#install spark
+cd
+wget https://downloads.apache.org/spark/spark-3.0.3/spark-3.0.3-bin-hadoop2.7.tgz
+tar xvf spark-*
+sudo mv spark-3.0.3-bin-hadoop2.7 /opt/spark
+sudo vi /etc/environment
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+export SPARK_HOME=/opt/spark
+export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
+export PYSPARK_PYTHON=/usr/bin/python3
+
+source /etc/environment
+start-master.sh
+
+start-slave.sh spark://localhost:7077
+spark-shell
+22/01/29 18:23:49 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Using Spark's default log4j profile: org/apache/spark/log4j-defaults.properties
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://ip-172-31-33-245.ap-southeast-1.compute.internal:4040
+Spark context available as 'sc' (master = local[*], app id = local-1643480635182).
+Spark session available as 'spark'.
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version 3.0.3
+      /_/
+
+Using Scala version 2.12.10 (OpenJDK 64-Bit Server VM, Java 1.8.0_312)
+Type in expressions to have them evaluated.
+Type :help for more information.
+
+scala> val df = spark.sql("select 1 i, 2 j, 3 k")
+df: org.apache.spark.sql.DataFrame = [i: int, j: int ... 1 more field]
+
+scala> df.show()
++---+---+---+
+|  i|  j|  k|
++---+---+---+
+|  1|  2|  3|
++---+---+---+
+
+
+scala>
+
+	# Install elastic search 
+	# https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-elasticsearch-on-ubuntu-18-04
+	curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+	echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-7.x.list
+	sudo apt update
+	sudo apt install elasticsearch
+	#configure elastic search
+	sudo vi /etc/elasticsearch/elasticsearch.yml
+		network.host: localhost
+	sudo systemctl start elasticsearch
+	sudo systemctl enable elasticsearch
+	#securing es
+	sudo ufw allow from 198.51.100.0 to any port 9200
+	sudo ufw enable
+	$test
+	curl -X GET 'http://localhost:9200'
+	# update conf to use elastic search
+	/home/ubuntu/sparkler/sparkler-core/build/conf/sparkler-default.yaml
+	# elasticsearch settings
+	elasticsearch.uri: http://localhost:9200
+
+	-->> curl -X PUT 'http://localhost:9200/crawldb'
+
+OR 
+# Install solr
+wget "http://archive.apache.org/dist/lucene/solr/8.5.0/solr-8.5.0.tgz"
+tar xzvf solr-8.5.0.tgz > /dev/null 2>&1
+cd solr-8.5.0
+cp -rv /home/ubuntu/sparkler/sparkler-core/build/conf/solr/crawldb server/solr/configsets/
+cp -rv server/solr/configsets/crawldb server/solr/
+bin/solr -e cloud
+bin/solr start
+status=$(sed -n 's/.*<int name=\"status\">\([^<]*\)<\/int>.*/\1/p' <<< $(curl -X POST localhost:8983/solr/admin/cores -d "action=CREATE&name=crawldb&instanceDir=crawldb"))
+
+
+
+cd /home/ubuntu/sparkler/sparkler-core/build/conf
+vi sparkler-default.yaml
+crawldb.backend: solr  # "solr" is default until "elasticsearch" becomes usable.
+solr.uri: http://localhost:8983/solr/crawldb
+
+
+
+-->> spark-submit --class edu.usc.irds.sparkler.Main --master spark://localhost:7077 --driver-java-options '-Dpf4j.pluginsDir=/home/ubuntu/sparkler/sparkler-core/build/plugins' --jars $(echo /home/ubuntu/sparkler/sparkler-core/build/sparkler-app-0.5.24-SNAPSHOT/lib/*.jar | tr ' ' ',') /home/ubuntu/sparkler/sparkler-core/build/sparkler-app-0.5.24-SNAPSHOT/lib/com.kythera.sparkler-app-0.5.24-SNAPSHOT.jar inject -su https://news.bbc.co.uk
+
+java -Xms1g -cp /home/ubuntu/sparkler/sparkler-core/build/conf:$(echo /home/ubuntu/sparkler/sparkler-core/build/sparkler-app-0.5.24-SNAPSHOT/lib/*.jar | tr ' ' ':') -Dpf4j.pluginsDir=/home/ubuntu/sparkler/sparkler-core/build/plugins edu.usc.irds.sparkler.Main inject -id sjob-1 -su https://news.bbc.co.uk
+
+
+
+java -Xms1g -cp /home/ubuntu/sparkler/sparkler-core/build/conf:$(echo /home/ubuntu/sparkler/sparkler-core/build/sparkler-app-0.5.24-SNAPSHOT/lib/*.jar | tr ' ' ':') -Dpf4j.pluginsDir=/home/ubuntu/sparkler/sparkler-core/build/plugins edu.usc.irds.sparkler.Main crawl -id sjob-1 -tn 10 -i 1
+
+
+Solr
+1. list collections
+curl http://localhost:8983/solr/admin/collections?action=LIST&wt=json
+
+2. count number of documents (numFound in response)
+curl http://localhost:8983/solr/crawldb/query?debug=query&q=*:*
+
+3. 
