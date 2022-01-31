@@ -3,9 +3,6 @@ source /etc/environment
 start-master.sh
 start-slave.sh spark://localhost:7077
 
-cd /home/ubuntu/sparkler/sparkler-core
-./release.sh
-
 cd ~/solr-8.5.0
 bin/solr start
 
